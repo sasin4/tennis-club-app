@@ -9,22 +9,6 @@ import MatchRegistrationForm from './components/MatchRegistrationForm';
 import { useAuthStore } from './store/authStore';
 import { supabase } from '../supabaseClient';
 
-function App() {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-
-  return (
-    <Router>
-      <Routes>
-        <Route 
-          path="/dashboard" 
-          element={isAuthenticated ? <MainDashboard /> : <Navigate to="/" />} 
-        />
-        {/* ... */}
-      </Routes>
-    </Router>
-  );
-}
-
 // 로그인 상태를 확인하여 접근을 제어하는 래퍼 컴포넌트
 const ProtectedRoute = ({ isAuthenticated, children }) => {
   if (!isAuthenticated) {
@@ -111,11 +95,19 @@ function AppContent() {
 }
 
 export default function App() {
-  return (
-    <Router>
-      <AppContent />
-    </Router>
-  );
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+    return (
+      <Router>
+        <Routes>
+          <Route 
+            path="/dashboard" 
+            element={isAuthenticated ? <MainDashboard /> : <Navigate to="/" />} 
+          />
+          {/* ... */}
+        </Routes>
+      </Router>
+    );
 }
 
 export const signUpUser = async (email, password, fullName) => {
