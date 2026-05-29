@@ -8,7 +8,7 @@ export const insertMatchResult = async (matchPayload) => {
   try {
     // [Step A] 경기 기본 정보 인서트
     const { data: matchData, error: matchError } = await supabase
-      .from('matches')
+      .from('games')
       .insert([
         {
           match_date: matchPayload.game_date,
@@ -38,7 +38,7 @@ export const insertMatchResult = async (matchPayload) => {
     }));
 
     const { error: setsError } = await supabase
-      .from('match_sets')
+      .from('game_sets')
       .insert(setsPayload);
 
     if (setsError) throw setsError;
@@ -61,13 +61,13 @@ export const fetchMatchHistory = async (page = 1, pageSize = 5) => {
 
     // Supabase(PostgREST)의 강력한 장점: 쿼리 한 줄로 하위 테이블 및 외래키 참조 테이블 조인이 가능합니다.
     const { data, error } = await supabase
-      .from('matches')
+      .from('games')
       .select(`
         id,
         match_date,
         match_type,
         winner_team,
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -92,7 +92,7 @@ export const fetchMatchHistory = async (page = 1, pageSize = 5) => {
         type: match.match_type === 'Doubles' ? '복식' : '단식',
         partner: match.partner?.name || null,
         opponents: [match.opponent1?.name, match.opponent2?.name].filter(Boolean),
-        setScores: match.match_sets
+        setScores: match.game_sets
           .sort((a, b) => a.set_number - b.set_number)
           .map((s) => ({
             team1: s.team1_score,
@@ -112,13 +112,13 @@ export const fetchMatchHistory = async (page = 1, pageSize = 5) => {
 export const fetchMatchDetail = async (matchId) => {
   try {
     const { data, error } = await supabase
-      .from('matches')
+      .from('games')
       .select(`
         id,
         match_date,
         match_type,
         winner_team,
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -140,7 +140,7 @@ export const fetchMatchDetail = async (matchId) => {
       type: data.match_type === 'Doubles' ? '복식' : '단식',
       partner: data.partner?.name || null,
       opponents: [data.opponent1?.name, data.opponent2?.name].filter(Boolean),    
-      setScores: data.match_sets
+      setScores: data.game_sets
         .sort((a, b) => a.set_number - b.set_number)
         .map((s) => ({  
           team1: s.team1_score,

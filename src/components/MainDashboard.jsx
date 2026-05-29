@@ -1,102 +1,37 @@
 import React, { useEffect, useState } from 'react';
-// ... 기존 import 생략
+import { Activity, Trophy, TrendingUp, ChevronRight, Plus } from 'lucide-react';
+
 import SkeletonLoader from './SkeletonLoader';
-
-const getDashboardStats = async (userId) => {
-  try {
-    const { data, error } = await supabase.rpc('get_dashboard_stats', { p_user_id: userId });
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    throw error;
-  }
-};
-
-function AppContent() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Supabase Auth 상태 감지
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-    }); 
-    // 초기 로그인 상태 체크
-    const session = supabase.auth.getSession();
-    setIsAuthenticated(!!session);
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  return (
-    <Routes>
-      {/* 1. 로그인 페이지 */}
-      <Route 
-        path="/" 
-        element={
-          <ProtectedRoute isAuthenticated={!isAuthenticated}> {/* 로그인 안된 상태에서만 접근 가능 */}
-            <LoginPage onNavigateToRegister={() => navigate('/register')} />
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* 2. 메인 대시보드 (Protected) */}
-      <Route 
-        path="/dashboard" 
-        element={         <ProtectedRoute isAuthenticated={isAuthenticated}>
-            <MainDashboard 
-              onLogout={() => supabase.auth.signOut()}
-              onNavigateToHistory={() => navigate('/history')}
-              onNavigateToRegister={() => navigate('/register')}
-            />
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* 3. 전체 경기 기록 리스트 (Protected) */}
-      <Route 
-        path="/history" 
-        element={
-          <ProtectedRoute isAuthenticated={isAuthenticated}>
-            <MatchHistoryPage onBack={() => navigate('/dashboard')} />
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* 4. 새 경기 등록 폼 (Protected) */}
-      <Route 
-        path="/register" 
-        element={
-          <ProtectedRoute isAuthenticated={isAuthenticated}>
-            <MatchRegistrationForm 
-              onBack={() => navigate(-1)} // 이전 페이지로 돌아가기
-              onSubmitSuccess={() => navigate('/dashboard')} // 등록 성공 시 대시보드로 이동
-            />
-          </ProtectedRoute>
-        } 
-      />
-      
-      {/* 404 잘못된 경로 처리 */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
-
-
+import { fetchDashboardStats } from '../supabaseClient';
 
 export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigateToRegister }) {
-  const [stats, setStats] = useState(null); // 초기값 null
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const safeStats = stats ?? { recent_win_rate: 0, recent_wins: 0, recent_total: 0, monthly_trends: [] };
 
   useEffect(() => {
-    const userId = '123e4567-e89b-12d3-a456-426614174000';
-    getDashboardStats(userId).then(data => {
-      setStats(data);
-      setLoading(false);
-    });
+    let isMounted = true;
+
+    const loadStats = async () => {
+      try {
+        const data = await fetchDashboardStats();
+        if (isMounted) {
+          setStats(data);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadStats();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // [로딩 중일 때]
@@ -123,13 +58,13 @@ export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigat
         <section className="grid grid-cols-2 gap-4">
           <div className="bg-[#002B5C] p-4 rounded-2xl text-white shadow-lg">
             <Trophy className="w-6 h-6 text-[#FFC510] mb-2" />
-            <div className="text-3xl font-black">{stats.recent_win_rate}%</div>
+            <div className="text-3xl font-black">{safeStats.recent_win_rate}%</div>
             <div className="text-[10px] text-blue-200 mt-1">최근 10경기 승률</div>
           </div>
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
             <Activity className="w-6 h-6 text-gray-400" />
             <div>
-              <div className="text-2xl font-black text-[#002B5C]">{stats.recent_wins}승 {stats.recent_total - stats.recent_wins}패</div>
+              <div className="text-2xl font-black text-[#002B5C]">{safeStats.recent_wins}승 {safeStats.recent_total - safeStats.recent_wins}패</div>
               <div className="text-[10px] text-gray-400">최근 10경기 전적</div>
             </div>
           </div>
@@ -141,7 +76,7 @@ export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigat
             <TrendingUp className="w-4 h-4 text-[#FFC510]" /> 월별 활동 추이
           </h2>
           <div className="space-y-3">
-            {stats.monthly_trends.map((m) => (
+            {safeStats.monthly_trends.map((m) => (
               <div key={m.match_month} className="flex justify-between items-center">
                 <span className="text-xs font-bold text-gray-500">{m.match_month}</span>
                 <div className="flex-1 mx-4 h-2 bg-gray-100 rounded-full overflow-hidden">

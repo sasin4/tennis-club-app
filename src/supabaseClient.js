@@ -55,7 +55,7 @@ export const signInUser = async (email, password) => {
 export const fetchMatchDetails = async (matchId) => {
   try {
     const { data, error } = await supabase
-      .from('matches')
+      .from('games')
       .select(`
         id,
         match_date,
@@ -64,7 +64,7 @@ export const fetchMatchDetails = async (matchId) => {
         partner:profiles!partner_id(name),
         opponent1:profiles!opponent1_id(name),
         opponent2:profiles!opponent2_id(name),
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -84,7 +84,7 @@ export const fetchMatchDetails = async (matchId) => {
       type: data.match_type === 'Doubles' ? '복식' : '단식',
       partner: data.partner?.name || null,
       opponents: [data.opponent1?.name, data.opponent2?.name].filter(Boolean),
-      setScores: data.match_sets
+      setScores: data.game_sets
         .sort((a, b) => a.set_number - b.set_number)
         .map((s) => ({
           team1: s.team1_score,
@@ -103,7 +103,7 @@ export const fetchMatchDetails = async (matchId) => {
 export const fetchMatchHistory = async (userId) => {
   try {
     const { data, error } = await supabase
-      .from('matches')
+      .from('games')
       .select(`
         id,
         match_date,
@@ -112,7 +112,7 @@ export const fetchMatchHistory = async (userId) => {
         partner:profiles!partner_id(name),
         opponent1:profiles!opponent1_id(name),
         opponent2:profiles!opponent2_id(name),
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -133,7 +133,7 @@ export const fetchMatchHistory = async (userId) => {
         type: match.match_type === 'Doubles' ? '복식' : '단식',
         partner: match.partner?.name || null,
         opponents: [match.opponent1?.name, match.opponent2?.name].filter(Boolean),
-        setScores: match.match_sets
+        setScores: match.game_sets
           .sort((a, b) => a.set_number - b.set_number)
           .map((s) => ({
             team1: s.team1_score,
@@ -156,13 +156,13 @@ export const fetchPaginatedMatchHistory = async (userId, page, pageSize) => {
 
   try {
     const { data, error } = await supabase
-      .from('matches')
+      .from('games')
       .select(`
         id,
         match_date,
         match_type,
         winner_team,
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -187,7 +187,7 @@ export const fetchPaginatedMatchHistory = async (userId, page, pageSize) => {
         type: match.match_type === 'Doubles' ? '복식' : '단식',
         partner: match.partner?.name || null,
         opponents: [match.opponent1?.name, match.opponent2?.name].filter(Boolean),
-        setScores: match.match_sets
+        setScores: match.game_sets
           .sort((a, b) => a.set_number - b.set_number)
           .map((s) => ({
             team1: s.team1_score,
@@ -206,13 +206,14 @@ export const fetchPaginatedMatchHistory = async (userId, page, pageSize) => {
 
 export const fetchMatchDetailsWithPagination = async (matchId) => {
   try {
-    const { data, error } = await supabase  .from('matches')
+    const { data, error } = await supabase
+      .from('games')
       .select(`
         id,
         match_date,
         match_type,
         winner_team,
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -235,7 +236,7 @@ export const fetchMatchDetailsWithPagination = async (matchId) => {
       type: data.match_type === 'Doubles' ? '복식' : '단식',
       partner: data.partner?.name || null,
       opponents: [data.opponent1?.name, data.opponent2?.name].filter(Boolean),
-      setScores: data.match_sets
+      setScores: data.game_sets
         .sort((a, b) => a.set_number - b.set_number)
         .map((s) => ({
           team1: s.team1_score,
@@ -254,7 +255,7 @@ export const fetchMatchDetailsWithPagination = async (matchId) => {
 export const fetchAllMatchHistory = async (userId) => {
   try {
     const { data, error } = await supabase
-      .from('matches')
+      .from('games')
       .select(`
         id,
         match_date,
@@ -263,7 +264,7 @@ export const fetchAllMatchHistory = async (userId) => {
         partner:profiles!partner_id(name),
         opponent1:profiles!opponent1_id(name),
         opponent2:profiles!opponent2_id(name),
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -284,7 +285,7 @@ export const fetchAllMatchHistory = async (userId) => {
         type: match.match_type === 'Doubles' ? '복식' : '단식',
         partner: match.partner?.name || null,
         opponents: [match.opponent1?.name, match.opponent2?.name].filter(Boolean),
-        setScores: match.match_sets
+        setScores: match.game_sets
           .sort((a, b) => a.set_number - b.set_number)
           .map((s) => ({
             team1: s.team1_score,
@@ -307,13 +308,13 @@ export const fetchMatchHistoryWithPagination = async (userId, page, pageSize) =>
 
   try {
     const { data, error } = await supabase
-      .from('matches')
+      .from('games')
       .select(`
         id,
         match_date,
         match_type,
         winner_team,
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -338,7 +339,7 @@ export const fetchMatchHistoryWithPagination = async (userId, page, pageSize) =>
         type: match.match_type === 'Doubles' ? '복식' : '단식',
         partner: match.partner?.name || null,
         opponents: [match.opponent1?.name, match.opponent2?.name].filter(Boolean),
-        setScores: match.match_sets
+        setScores: match.game_sets
           .sort((a, b) => a.set_number - b.set_number)
           .map((s) => ({
             team1: s.team1_score,
@@ -358,13 +359,13 @@ export const fetchMatchHistoryWithPagination = async (userId, page, pageSize) =>
 export const fetchMatchDetailWithPagination = async (matchId) => {
   try {
     const { data, error } = await supabase
-      .from('matches')
+      .from('games')
       .select(`
         id,
         match_date,
         match_type,
         winner_team,
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -387,7 +388,7 @@ export const fetchMatchDetailWithPagination = async (matchId) => {
       type: data.match_type === 'Doubles' ? '복식' : '단식',
       partner: data.partner?.name || null,
       opponents: [data.opponent1?.name, data.opponent2?.name].filter(Boolean),
-      setScores: data.match_sets
+      setScores: data.game_sets
         .sort((a, b) => a.set_number - b.set_number)
         .map((s) => ({
           team1: s.team1_score,
@@ -409,7 +410,7 @@ export const fetchAllMatchHistoryWithPagination = async (userId, page, pageSize)
 
   try {
     const { data, error } = await supabase
-      .from('matches')
+      .from('games')
       .select(`
         id,
         match_date,
@@ -418,7 +419,7 @@ export const fetchAllMatchHistoryWithPagination = async (userId, page, pageSize)
         partner:profiles!partner_id(name),
         opponent1:profiles!opponent1_id(name),
         opponent2:profiles!opponent2_id(name),
-        match_sets (
+        game_sets (
           set_number,
           team1_score,
           team2_score,
@@ -440,7 +441,7 @@ export const fetchAllMatchHistoryWithPagination = async (userId, page, pageSize)
         type: match.match_type === 'Doubles' ? '복식' : '단식',
         partner: match.partner?.name || null,
         opponents: [match.opponent1?.name, match.opponent2?.name].filter(Boolean),
-        setScores: match.match_sets
+        setScores: match.game_sets
           .sort((a, b) => a.set_number - b.set_number)
           .map((s) => ({
             team1: s.team1_score,
