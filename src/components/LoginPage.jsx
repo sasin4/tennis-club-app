@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Trophy, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import SignupPage from './SignupPage';
 
 export default function LoginPage() {
   const setUser = useAuthStore((state) => state.setUser);
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,6 +28,9 @@ export default function LoginPage() {
       handleLogin(); // 성공 시 로그인 상태 변경
     }, 1500);
   };
+  if (isSignup) {
+    return <SignupPage onBack={() => setIsSignup(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#002B5C] flex flex-col items-center justify-center p-4">

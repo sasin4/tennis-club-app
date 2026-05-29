@@ -108,3 +108,83 @@ export const fetchMatchHistory = async (page = 1, pageSize = 5) => {
     return [];
   }
 };
+
+export const fetchMatchDetail = async (matchId) => {
+  try {
+    const { data, error } = await supabase
+      .from('matches')
+      .select(`
+        id,
+        match_date,
+        match_type,
+        winner_team,
+        match_sets (
+          set_number,
+          team1_score,
+          team2_score,
+          team1_tiebreak,
+          team2_tiebreak    ),
+        partner:profiles!team1_p2_id_fkey(name),  
+        opponent1:profiles!team2_p1_id_fkey(name),
+        opponent2:profiles!team2_p2_id_fkey(name)
+      `)
+      .eq('id', matchId)
+      .single();
+
+    if (error) throw error;
+
+    const isMyTeamWin = data.winner_team === 1;
+    return {
+      id: data.id,
+      date: data.match_date.replace(/-/g, '.'),
+      type: data.match_type === 'Doubles' ? '복식' : '단식',
+      partner: data.partner?.name || null,
+      opponents: [data.opponent1?.name, data.opponent2?.name].filter(Boolean),    
+      setScores: data.match_sets
+        .sort((a, b) => a.set_number - b.set_number)
+        .map((s) => ({  
+          team1: s.team1_score,
+          team2: s.team2_score,
+          t1Tie: s.team1_tiebreak,
+          t2Tie: s.team2_tiebreak,
+        })),
+      isWinner: isMyTeamWin,
+    };
+  } catch (error) {
+    console.error('상세 기록 로드 중 오류 발생:', error.message);
+    return null;
+  }
+};
+
+export const signUpUser = async (email, password, fullName) => {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName } // 트리거에서 이 값을 받아 profiles.name에 저장합니다.
+      }
+    });
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error) {
+    console.error('회원가입 실패:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+export const signInUser = async (email, password) => {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error) {
+    console.error('로그인 실패:', error.message);
+    return { success: false, error: error.message };
+  }
+};

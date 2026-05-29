@@ -2,6 +2,91 @@ import React, { useEffect, useState } from 'react';
 // ... 기존 import 생략
 import SkeletonLoader from './SkeletonLoader';
 
+const getDashboardStats = async (userId) => {
+  try {
+    const { data, error } = await supabase.rpc('get_dashboard_stats', { p_user_id: userId });
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    throw error;
+  }
+};
+
+function AppContent() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Supabase Auth 상태 감지
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    }); 
+    // 초기 로그인 상태 체크
+    const session = supabase.auth.getSession();
+    setIsAuthenticated(!!session);
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  return (
+    <Routes>
+      {/* 1. 로그인 페이지 */}
+      <Route 
+        path="/" 
+        element={
+          <ProtectedRoute isAuthenticated={!isAuthenticated}> {/* 로그인 안된 상태에서만 접근 가능 */}
+            <LoginPage onNavigateToRegister={() => navigate('/register')} />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* 2. 메인 대시보드 (Protected) */}
+      <Route 
+        path="/dashboard" 
+        element={         <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <MainDashboard 
+              onLogout={() => supabase.auth.signOut()}
+              onNavigateToHistory={() => navigate('/history')}
+              onNavigateToRegister={() => navigate('/register')}
+            />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* 3. 전체 경기 기록 리스트 (Protected) */}
+      <Route 
+        path="/history" 
+        element={
+          <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <MatchHistoryPage onBack={() => navigate('/dashboard')} />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* 4. 새 경기 등록 폼 (Protected) */}
+      <Route 
+        path="/register" 
+        element={
+          <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <MatchRegistrationForm 
+              onBack={() => navigate(-1)} // 이전 페이지로 돌아가기
+              onSubmitSuccess={() => navigate('/dashboard')} // 등록 성공 시 대시보드로 이동
+            />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* 404 잘못된 경로 처리 */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+
+
 export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigateToRegister }) {
   const [stats, setStats] = useState(null); // 초기값 null
   const [loading, setLoading] = useState(true);

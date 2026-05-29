@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 
 // 앞서 만든 컴포넌트들을 불러옵니다
@@ -20,20 +20,17 @@ const ProtectedRoute = ({ isAuthenticated, children }) => {
 // 라우팅 이동을 관리하는 메인 컨테이너 컴포넌트
 function AppContent() {
   const navigate = useNavigate();
-  
-  // 실제 앱에서는 Context API, Zustand, Redux 등으로 전역 관리합니다.
-  // 여기서는 테스트를 위해 App 레벨의 state로 구현했습니다.
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, login, logout } = useAuthStore();
 
   // 로그인 성공 시 처리
   const handleLogin = () => {
-    setIsAuthenticated(true);
+    login();
     navigate('/dashboard');
   };
 
   // 로그아웃 처리
   const handleLogout = () => {
-    setIsAuthenticated(false);
+    logout();
     navigate('/');
   };
 
@@ -95,19 +92,11 @@ function AppContent() {
 }
 
 export default function App() {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-
-    return (
-      <Router>
-        <Routes>
-          <Route 
-            path="/dashboard" 
-            element={isAuthenticated ? <MainDashboard /> : <Navigate to="/" />} 
-          />
-          {/* ... */}
-        </Routes>
-      </Router>
-    );
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  );
 }
 
 export const signUpUser = async (email, password, fullName) => {
