@@ -11,11 +11,26 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export const fetchDashboardStats = async () => {
   try {
     const { data, error } = await supabase.rpc('get_dashboard_stats');
-    if (error) throw error;
+    if (error) {
+      console.warn('get_dashboard_stats RPC not available, returning default stats.', error);
+      return { 
+        recent_win_rate: 0, 
+        recent_wins: 0, 
+        recent_total: 0, 
+        monthly_trends: [],
+        avg_points_per_set: 0
+      };
+    }
     return data;
   } catch (error) {
     console.error('대시보드 통계 가져오기 실패:', error);
-    return null;
+    return { 
+      recent_win_rate: 0, 
+      recent_wins: 0, 
+      recent_total: 0, 
+      monthly_trends: [],
+      avg_points_per_set: 0
+    };
   }
 };
 

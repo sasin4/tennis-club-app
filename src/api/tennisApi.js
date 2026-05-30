@@ -7,13 +7,17 @@ import { supabase } from '../supabaseClient';
 export const insertMatchResult = async (matchPayload) => {
   try {
     // [Step A] 경기 기본 정보 인서트
+    // get current authenticated user (v2 API)
+    const { data: currentUserData } = await supabase.auth.getUser();
+    const currentUserId = currentUserData?.user?.id || null;
+
     const { data: matchData, error: matchError } = await supabase
       .from('games')
       .insert([
         {
           match_date: matchPayload.game_date,
           match_type: matchPayload.match_type,
-          team1_p1_id: supabase.auth.user()?.id, // 현재 로그인한 내 유저 ID
+          team1_p1_id: currentUserId, // 현재 로그인한 내 유저 ID
           team1_p2_id: matchPayload.partner_id || null,
           team2_p1_id: matchPayload.opponent1_id,
           team2_p2_id: matchPayload.opponent2_id || null,
@@ -156,7 +160,7 @@ export const fetchMatchDetail = async (matchId) => {
   }
 };
 
-export const signUpUser = async (email, password, name, phone) => {
+export const signUpUser = async (email, password, name, phone, avatarFile = null) => {
   try {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -171,6 +175,16 @@ export const signUpUser = async (email, password, name, phone) => {
     });
 
     if (error) throw error;
+    // If an avatar file was provided, upload it and upsert the profile
+    if (avatarFile && data?.user) {
+      const uploadResult = await uploadProfileImage(data.user.id, avatarFile, name, phone, email);
+      if (!uploadResult.success) {
+        // Signup succeeded but avatar upload failed - return info so caller can notify user
+        return { success: true, data, upload: { success: false, error: uploadResult.error } };
+      }
+      return { success: true, data, upload: { success: true, url: uploadResult.url } };
+    }
+
     return { success: true, data };
   } catch (error) {
     console.error('회원가입 실패:', error.message);
@@ -229,6 +243,118 @@ export const updatePassword = async (newPassword) => {
     return { success: true };
   } catch (error) {
     console.error('비밀번호 변경 실패:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// 프로필 사진 업로드 및 DB 업데이트 함수 추가
+export const uploadProfileImage = async (userId, file, name = null, phone = null, email = null) => {
+  try {
+    console.log('📸 [Step 1] 파일 업로드 시작', { userId, fileName: file.name, fileSize: file.size });
+    
+    // 1. 파일 이름 난수화 (중복 방지)
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${userId}_${Math.random()}.${fileExt}`;
+    const filePath = `${fileName}`;
+    console.log('📝 [Step 1] 생성된 파일 경로:', filePath);
+
+    // 2. Storage 'avatars' 버킷에 파일 업로드
+    console.log('⬆️ [Step 2] Supabase Storage에 업로드 중...');
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error('❌ [Step 2] 업로드 실패:', uploadError);
+      throw uploadError;
+    }
+    console.log('✅ [Step 2] 업로드 성공:', uploadData);
+
+    // 3. 업로드된 파일의 공개 URL 가져오기
+    console.log('🔗 [Step 3] 공개 URL 생성 중...');
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+    const publicUrl = data.publicUrl;
+    console.log('✅ [Step 3] 공개 URL:', publicUrl);
+
+    // 4. profiles 테이블에 avatar_url을 삽입 또는 업데이트 (프로필이 없으면 생성)
+    console.log('💾 [Step 4] DB에 저장 중...', { id: userId, avatar_url: publicUrl });
+    
+    // email이 전달되지 않으면 현재 인증된 사용자의 이메일 가져오기
+    let userEmail = email;
+    if (!userEmail) {
+      const { data: currentUserData } = await supabase.auth.getUser();
+      userEmail = currentUserData?.user?.email;
+    }
+    console.log('📧 현재 사용자 이메일:', userEmail);
+    
+    const profileData = { 
+      id: userId, 
+      avatar_url: publicUrl 
+    };
+    
+    // 제공된 정보가 있으면 프로필에 포함
+    if (userEmail) profileData.email = userEmail;
+    if (name) profileData.name = name;
+    if (phone) profileData.phone = phone;
+    
+    const { data: upsertData, error: updateError } = await supabase
+      .from('profiles')
+      .upsert(profileData);
+    
+
+    if (updateError) {
+      console.error('❌ [Step 4] DB 저장 실패:', updateError);
+      throw updateError;
+    }
+    console.log('✅ [Step 4] DB 저장 성공:', upsertData);
+
+    console.log('🎉 [완료] 프로필 사진 업로드 완료!');
+    return { success: true, url: publicUrl };
+  } catch (error) {
+    console.error('❌ [전체] 사진 업로드 에러:', error);
+    console.error('📋 에러 상세:', {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+      stack: error.stack
+    });
+    return { success: false, error: error.message };
+  }
+};
+// 기존 코드 유지...
+
+// 1. 비밀번호 확인용 (현재 로그인된 이메일과 입력한 비밀번호로 재로그인 시도)
+export const verifyPassword = async (email, password) => {
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { success: false, error: '비밀번호가 일치하지 않습니다.' };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// 2. 프로필 통합 업데이트 (Auth 이메일 + Profiles 테이블)
+export const updateUserProfile = async (userId, newEmail, name, phone, avatarUrl) => {
+  try {
+    // A. 이메일이 변경되었다면 Auth 정보 업데이트
+    // (주의: Supabase 기본 설정상 새 이메일로 인증 링크가 발송될 수 있습니다.)
+    if (newEmail) {
+      const { error: authError } = await supabase.auth.updateUser({ email: newEmail });
+      if (authError) throw authError;
+    }
+
+    // B. profiles 테이블 업데이트
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ name, phone, avatar_url: avatarUrl })
+      .eq('id', userId);
+
+    if (profileError) throw profileError;
+
+    return { success: true };
+  } catch (error) {
+    console.error('프로필 업데이트 실패:', error.message);
     return { success: false, error: error.message };
   }
 };

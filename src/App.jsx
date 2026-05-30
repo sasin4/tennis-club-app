@@ -6,6 +6,7 @@ import LoginPage from './components/LoginPage';
 import MainDashboard from './components/MainDashboard';
 import MatchHistoryPage from './components/MatchHistoryPage';
 import MatchRegistrationForm from './components/MatchRegistrationForm';
+import ProfilePage from './components/ProfilePage';
 import { useAuthStore } from './store/authStore';
 import { supabase } from './supabaseClient';
 import { signUpUser } from './supabaseClient';
@@ -63,6 +64,8 @@ function AppContent() {
               onLogout={handleLogout}
               onNavigateToHistory={() => navigate('/history')}
               onNavigateToRegister={() => navigate('/register')}
+              onNavigateToDashboard={() => navigate('/dashboard')}
+              onNavigateToProfile={() => navigate('/profile')}
             />
           </ProtectedRoute>
         } 
@@ -89,6 +92,22 @@ function AppContent() {
             />
           </ProtectedRoute>
         } 
+      />
+      
+      {/* 5. 프로필 페이지 (Protected) */}
+      <Route 
+        path="/profile" 
+        element={
+          <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <ProfilePage />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* 6. 비밀번호 변경 페이지 (재설정 플로우를 위해 공개) */}
+      <Route 
+        path="/update-password" 
+        element={<UpdatePasswordPage />} 
       />
       
       {/* 404 잘못된 경로 처리 */}

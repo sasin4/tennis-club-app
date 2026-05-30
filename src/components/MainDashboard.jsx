@@ -1,13 +1,67 @@
-import React, { useEffect, useState } from 'react';
-import { Activity, Trophy, TrendingUp, ChevronRight, Plus } from 'lucide-react';
-
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Menu, Home, User, LogOut, Activity, Trophy, TrendingUp, ChevronRight, Plus } from 'lucide-react';
 import SkeletonLoader from './SkeletonLoader';
-import { fetchDashboardStats } from '../supabaseClient';
+import { fetchDashboardStats, supabase } from '../supabaseClient';
 
-export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigateToRegister }) {
+
+export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigateToRegister, onNavigateToDashboard, onNavigateToProfile }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const safeStats = stats ?? { recent_win_rate: 0, recent_wins: 0, recent_total: 0, monthly_trends: [] };
+  const safeStats = {
+    recent_win_rate: 0,
+    recent_wins: 0,
+    recent_total: 0,
+    monthly_trends: [],
+    avg_points_per_set: 0,
+    ...stats,
+  };
+  // 🚨 추가 1: 프로필 사진 URL을 담을 상태
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  
+
+
+  // 🚨 추가 2: 대시보드 로딩 시 유저의 아바타 URL을 가져오는 로직
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      // 1. 현재 로그인된 세션/유저 정보 확인
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // 2. profiles 테이블에서 내 avatar_url만 쏙 빼오기
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (data?.avatar_url) {
+          setAvatarUrl(data.avatar_url);
+        }
+      }
+    };
+    fetchUserProfile();
+  }, []);
+
+
+  // 햄버거 메뉴와 Dashboard 바로가기, 프로파일, 로그아웃 버튼 추가
+  const navigate = useNavigate();
+  // 🚨 추가: 메뉴 열림/닫힘 상태 관리
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // 🚨 추가: 메뉴 바깥을 클릭하면 드롭다운이 닫히도록 하는 안전 장치
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  //메뉴 추가 end
+
 
   useEffect(() => {
     let isMounted = true;
@@ -47,11 +101,78 @@ export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigat
   // [데이터 로딩 완료 후]
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-     {/* 헤더 */}
-      <header className="bg-white px-6 py-4 flex justify-between items-center shadow-sm">
-        <h1 className="font-black text-xl text-[#002B5C]">MY DASHBOARD</h1>
-        <button onClick={onLogout} className="text-xs text-gray-400 font-bold hover:text-red-500">로그아웃</button>
+      {/* 대시보드 상단 헤더 영역 */}
+      <header className="flex justify-between items-center mb-8 relative">
+        {/* 🚨 교체된 타이틀 영역: 사진 + 텍스트 */}
+        <div
+          className="flex items-center gap-3 cursor-pointer hover:opacity-70 transition-opacity"
+          onClick={() => {
+            onNavigateToProfile ? onNavigateToProfile() : navigate('/profile');
+          }}
+        >
+          {avatarUrl ? (
+            // 사진이 있는 경우 (동그랗게 크롭)
+            <img 
+              src={avatarUrl} 
+              alt="프로필" 
+              className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
+            />
+          ) : (
+            // 사진이 없는 경우 (기본 유저 아이콘)
+            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center border-2 border-white shadow-sm">
+              <User className="w-5 h-5 text-gray-400" />
+            </div>
+          )}
+          <h1 className="text-2xl font-black text-[#002B5C]">MY DASHBOARD</h1>
+        </div>
+        {/* 🚨 교체된 햄버거 메뉴 영역 */}
+        <div className="relative" ref={menuRef}>
+          {/* 햄버거 버튼 */}
+          <button 
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="p-2 bg-white rounded-xl shadow-sm border border-gray-100 hover:bg-gray-50 transition flex items-center justify-center"
+          >
+            <Menu className="w-6 h-6 text-[#002B5C]" />
+          </button>
+
+          {/* 드롭다운 메뉴 (isMenuOpen이 true일 때만 보임) */}
+          {isMenuOpen && (
+            <div className="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50 overflow-hidden flex flex-col">
+              
+              <button 
+                onClick={() => { onNavigateToDashboard ? onNavigateToDashboard() : navigate('/dashboard'); setIsMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
+              >
+                <Home className="w-4 h-4 text-gray-500" />
+                Main
+              </button>
+
+              <button 
+                onClick={() => { 
+                  onNavigateToProfile ? onNavigateToProfile() : navigate('/profile'); 
+                  setIsMenuOpen(false); 
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
+              >
+                <User className="w-4 h-4 text-gray-500" />
+                프로파일
+              </button>
+
+              <div className="border-t border-gray-100 my-1"></div> {/* 구분선 */}
+
+              <button 
+                onClick={() => { onLogout(); setIsMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition"
+              >
+                <LogOut className="w-4 h-4 text-red-500" />
+                로그아웃
+              </button>
+              
+            </div>
+          )}
+        </div>
       </header>
+      {/* 헤더 공간 종료 */}
 
       <main className="p-4 space-y-4">
         {/* 승률 통계 카드 */}
@@ -76,7 +197,7 @@ export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigat
             <TrendingUp className="w-4 h-4 text-[#FFC510]" /> 월별 활동 추이
           </h2>
           <div className="space-y-3">
-            {safeStats.monthly_trends.map((m) => (
+            {(safeStats.monthly_trends ?? []).map((m) => (
               <div key={m.match_month} className="flex justify-between items-center">
                 <span className="text-xs font-bold text-gray-500">{m.match_month}</span>
                 <div className="flex-1 mx-4 h-2 bg-gray-100 rounded-full overflow-hidden">
