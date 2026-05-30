@@ -192,3 +192,32 @@ export const signInUser = async (email, password) => {
     return { success: false, error: error.message };
   }
 };
+
+// 1. 비밀번호 초기화 이메일 발송
+export const resetPasswordForEmail = async (email) => {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // 이메일 링크 클릭 시 돌아올 앱 주소 (로컬 또는 Vercel 주소)
+      redirectTo: `${window.location.origin}/update-password`, 
+    });
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('이메일 발송 실패:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// 2. 새 비밀번호로 업데이트 (이메일 링크를 타고 들어온 후 실행됨)
+export const updatePassword = async (newPassword) => {
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('비밀번호 변경 실패:', error.message);
+    return { success: false, error: error.message };
+  }
+};

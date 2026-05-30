@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Loader2, ArrowLeft } from 'lucide-react';
 import { signUpUser } from '../api/tennisApi';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 export default function SignupPage({ onBack }) {
   const [email, setEmail] = useState('');
@@ -11,8 +13,13 @@ export default function SignupPage({ onBack }) {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    
+    // 유효성 검사 방어 로직
+    if (!phone || phone.length < 10) {
+      alert('유효한 휴대폰 번호를 입력해주세요.');
+      return;
+    }
     setIsLoading(true);
-
     const result = await signUpUser(email, password, name, phone);
     
     if (result.success) {
@@ -38,9 +45,18 @@ export default function SignupPage({ onBack }) {
             <input type="text" placeholder="이름 (닉네임)" value={name} onChange={(e) => setName(e.target.value)}
                    className="w-full pl-10 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-[#002B5C]" required />
           </div>
+          {/* 🚨 업그레이드된 휴대폰 번호 입력란 */}
           <div className="relative">
-            <input type="text" placeholder="전화번호" value={phone} onChange={(e) => setPhone(e.target.value)}
-                   className="w-full pl-10 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-[#002B5C]" required />
+            <PhoneInput
+              international
+              defaultCountry="KR"
+              value={phone}
+              onChange={setPhone}
+              className="w-full py-3 px-4 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#002B5C] transition"
+            />
+            <p className="text-xs text-gray-400 mt-1 pl-1">
+              * 국가 코드를 포함한 형식으로 자동 저장됩니다.
+            </p>
           </div>
           <div className="relative">
             <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-300" />
