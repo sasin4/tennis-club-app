@@ -6,13 +6,14 @@ export default function SignupPage({ onBack }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
-    const result = await signUpUser(email, password, name);
+    const result = await signUpUser(email, password, name, phone);
     
     if (result.success) {
       alert('회원가입 성공! 이메일을 확인하여 인증을 완료해주세요.');
@@ -35,6 +36,10 @@ export default function SignupPage({ onBack }) {
           <div className="relative">
             <User className="absolute left-3 top-3 w-5 h-5 text-gray-300" />
             <input type="text" placeholder="이름 (닉네임)" value={name} onChange={(e) => setName(e.target.value)}
+                   className="w-full pl-10 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-[#002B5C]" required />
+          </div>
+          <div className="relative">
+            <input type="text" placeholder="전화번호" value={phone} onChange={(e) => setPhone(e.target.value)}
                    className="w-full pl-10 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-[#002B5C]" required />
           </div>
           <div className="relative">

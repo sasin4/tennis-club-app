@@ -19,13 +19,13 @@ export const fetchDashboardStats = async () => {
   }
 };
 
-export const signUpUser = async (email, password, fullName) => {
+export const signUpUser = async (email, password, name, phone) => {
   try {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName } // 트리거에서 이 값을 받아 profiles.name에 저장합니다.
+        data: { name, phone }
       }
     });
 

@@ -156,13 +156,17 @@ export const fetchMatchDetail = async (matchId) => {
   }
 };
 
-export const signUpUser = async (email, password, fullName) => {
+export const signUpUser = async (email, password, name, phone) => {
   try {
     const { data, error } = await supabase.auth.signUp({
       email,
-      password,
+      password, // 인증용 비밀번호 (Supabase가 알아서 안전하게 해싱하여 auth.users에 저장)
       options: {
-        data: { full_name: fullName } // 트리거에서 이 값을 받아 profiles.name에 저장합니다.
+        data: { 
+          // DB 트리거의 new.raw_user_meta_data 로 전달될 데이터
+          name: name,
+          phone: phone
+        } 
       }
     });
 
