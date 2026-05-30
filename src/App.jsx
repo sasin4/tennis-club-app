@@ -104,21 +104,3 @@ export default function App() {
     </Router>
   );
 }
-
-export const signUpUser = async (email, password, name, phone) => {
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name, phone }
-      }
-    });
-
-    if (error) throw error;
-    return { success: true, data };
-  } catch (error) {
-    console.error('회원가입 실패:', error.message);
-    return { success: false, error: error.message };
-  }
-};
