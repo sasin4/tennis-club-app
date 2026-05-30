@@ -185,11 +185,22 @@ export const signInUser = async (email, password) => {
       password,
     });
 
-    if (error) throw error;
+// 🚨 [보완 1] Supabase가 반환한 인증 에러를 가장 먼저 체크합니다.
+    if (error) {
+      return { success: false, error: error.message }; 
+      // 등록되지 않은 ID나 틀린 비밀번호면 여기서 걸러져 "Invalid login credentials" 등이 반환됩니다.
+    }
+    // 🚨 [보완 2] 데이터나 유저 객체가 실제로 존재하는지 한 번 더 안전하게 검사합니다.
+    if (!data || !data.user) {
+      return { success: false, error: '유저 정보를 찾을 수 없습니다.' };
+    }
+    // 모든 검증을 통과해야만 성공 반환
     return { success: true, data };
+
   } catch (error) {
-    console.error('로그인 실패:', error.message);
-    return { success: false, error: error.message };
+    // 네트워크 오류 등 예기치 못한 시스템 예외 처리
+    console.error('로그인 시스템 에러:', error.message);
+    return { success: false, error: '로그인 중 오류가 발생했습니다. ID와 비밀번호를 다시 확인해주세요.' };
   }
 };
 

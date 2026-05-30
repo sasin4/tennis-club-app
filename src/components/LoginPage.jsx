@@ -7,11 +7,21 @@ export default function LoginPage() {
   const setUser = useAuthStore((state) => state.setUser);
 
   const handleLogin = async () => {
-    // Supabase 로그인 성공 가정...
-    const mockUserData = { id: 'uuid-123', name: '테니스왕' };
-    
-    // 전역 상태에 즉시 반영
-    setUser(mockUserData); 
+e.preventDefault();
+  setIsLoading(true);
+
+  // 보완된 로그인 API 호출
+  const result = await signInUser(email, password);
+  if (result.success) {
+    // 💡 로그인 성공 시에만 다음 단계(대시보드 이동, 세션 저장 등) 진행
+    alert('So nice to see you again!');
+    // navigate('/dashboard'); 또는 화면 전환 로직
+  } else {
+    // 🚨 [보완 3] 실패 시 절대로 화면을 넘기지 않고 에러를 사용자에게 알림
+    // result.error에는 "Invalid login credentials" (잘못된 인증 정보) 등의 메시지가 담겨 있습니다.
+    alert(`Beep! Beep!: ${result.error}`);
+  }
+  setIsLoading(false);
   };
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
