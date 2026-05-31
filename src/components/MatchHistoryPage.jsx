@@ -1,50 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Filter, Calendar, ChevronDown } from 'lucide-react';
-// import { tennisApi } from '../api/tennisApi'; // 실제 API 연동 시 사용
+import { ArrowLeft, Filter, Calendar, ChevronDown, X } from 'lucide-react';
+import { fetchMatchHistory } from '../api/tennisApi';
 
 export default function MatchHistoryPage({ onBack }) {
   const [matches, setMatches] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // 더미 데이터 생성 함수 (API 호출을 대체)
-  const generateMockMatches = (pageNumber) => {
-    return Array.from({ length: 5 }).map((_, i) => {
-      const id = (pageNumber - 1) * 5 + i + 1;
-      const isWin = Math.random() > 0.4; // 60% 확률로 승리
-      const isDoubles = Math.random() > 0.5; // 단식/복식 랜덤
-      return {
-        id,
-        date: `2026.05.${28 - id < 10 ? `0${28 - id}` : 28 - id}`,
-        type: isDoubles ? '복식' : '단식',
-        partner: isDoubles ? '홍길동' : null,
-        opponents: isDoubles ? ['김철수', '이영희'] : ['박민수'],
-        setScores: [
-          { team1: isWin ? 6 : 4, team2: isWin ? 4 : 6 },
-          { team1: isWin ? 7 : 3, team2: isWin ? 5 : 6, t1Tie: isWin ? 7 : null, t2Tie: isWin ? null : 4 },
-        ],
-        isWinner: isWin
-      };
-    });
+  // 오늘 날짜와 한 달 전 날짜 계산 (기본 필터값)
+  const today = new Date().toLocaleDateString('sv-SE');
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  const oneMonthAgo = lastMonth.toLocaleDateString('sv-SE');
+
+  // 필터 상태 관리
+  const [filters, setFilters] = useState({
+    startDate: oneMonthAgo,
+    endDate: today,
+    result: 'all', // all, win, lose
+    matchType: 'all' // all, Singles, Doubles
+  });
+
+  const PAGE_SIZE = 5;
+
+  // 실제 API를 호출하여 데이터를 가져오는 함수
+  const loadMatches = async (pageNumber, isMore = false, currentFilters = filters) => {
+    setIsLoading(true);
+    const data = await fetchMatchHistory(pageNumber, PAGE_SIZE, currentFilters);
+    
+    // 가져온 데이터가 페이지 사이즈보다 작으면 더 이상 데이터가 없는 것으로 판단
+    if (data.length < PAGE_SIZE) {
+      setHasMore(false);
+    }
+
+    if (isMore) {
+      setMatches((prev) => [...prev, ...data]);
+    } else {
+      setMatches(data);
+    }
+    setIsLoading(false);
   };
 
   useEffect(() => {
-    // 초기 데이터 로드
-    setIsLoading(true);
-    setTimeout(() => {
-      setMatches(generateMockMatches(1));
-      setIsLoading(false);
-    }, 500);
-  }, []);
+    setPage(1);
+    setHasMore(true);
+    loadMatches(1, false);
+  }, [filters]);
 
   const handleLoadMore = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const newPage = page + 1;
-      setMatches((prev) => [...prev, ...generateMockMatches(newPage)]);
-      setPage(newPage);
-      setIsLoading(false);
-    }, 500);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadMatches(nextPage, true);
   };
 
   return (
@@ -58,10 +66,74 @@ export default function MatchHistoryPage({ onBack }) {
           </button>
           <h1 className="font-bold text-lg tracking-tight">전체 경기 기록</h1>
         </div>
-        <button className="p-2 hover:bg-blue-900 rounded-full transition flex items-center gap-1 text-sm text-[#FFC510]">
-          <Filter className="w-4 h-4" /> 필터
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className={`p-2 rounded-full transition flex items-center gap-1 text-sm ${showFilters ? 'bg-blue-900 text-white' : 'hover:bg-blue-900 text-[#FFC510]'}`}
+        >
+          {showFilters ? <X className="w-4 h-4" /> : <Filter className="w-4 h-4" />} 
+          필터
         </button>
       </header>
+
+      {/* --- 필터 드로어 --- */}
+      {showFilters && (
+        <div className="bg-white border-b border-gray-200 p-4 space-y-4 shadow-sm animate-in slide-in-from-top duration-200">
+          <div className="grid grid-cols-2 gap-4">
+            {/* 날짜 필터 */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">From</label>
+              <input 
+                type="date" 
+                value={filters.startDate}
+                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-xs outline-none focus:ring-1 focus:ring-[#002B5C]"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">To</label>
+              <input 
+                type="date" 
+                value={filters.endDate}
+                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-xs outline-none focus:ring-1 focus:ring-[#002B5C]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* 승패 필터 */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Result</label>
+              <div className="flex bg-gray-100 p-1 rounded">
+                {['all', 'win', 'lose'].map(r => (
+                  <button 
+                    key={r}
+                    onClick={() => setFilters(prev => ({ ...prev, result: r }))}
+                    className={`flex-1 py-1 text-[10px] font-bold rounded transition ${filters.result === r ? 'bg-white text-[#002B5C] shadow-sm' : 'text-gray-400'}`}
+                  >
+                    {r === 'all' ? '전체' : r === 'win' ? '승' : '패'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* 경기 방식 필터 */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Type</label>
+              <div className="flex bg-gray-100 p-1 rounded">
+                {['all', 'Singles', 'Doubles'].map(t => (
+                  <button 
+                    key={t}
+                    onClick={() => setFilters(prev => ({ ...prev, matchType: t }))}
+                    className={`flex-1 py-1 text-[10px] font-bold rounded transition ${filters.matchType === t ? 'bg-white text-[#002B5C] shadow-sm' : 'text-gray-400'}`}
+                  >
+                    {t === 'all' ? '전체' : t === 'Singles' ? '단식' : '복식'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- MAIN LIST CONTAINER --- */}
       <main className="max-w-2xl mx-auto px-4 mt-6 space-y-4">
@@ -131,15 +203,17 @@ export default function MatchHistoryPage({ onBack }) {
         </div>
 
         {/* 더보기 버튼 (Pagination 처리용) */}
-        <button 
-          onClick={handleLoadMore}
-          disabled={isLoading}
-          className="w-full py-4 text-sm font-bold text-[#002B5C] bg-white border-2 border-blue-100 rounded-xl hover:bg-blue-50 transition flex justify-center items-center gap-2 mt-6"
-        >
-          {isLoading ? '불러오는 중...' : (
-            <>더보기 <ChevronDown className="w-4 h-4" /></>
-          )}
-        </button>
+        {hasMore && (
+          <button 
+            onClick={handleLoadMore}
+            disabled={isLoading}
+            className="w-full py-4 text-sm font-bold text-[#002B5C] bg-white border-2 border-blue-100 rounded-xl hover:bg-blue-50 transition flex justify-center items-center gap-2 mt-6 disabled:opacity-50"
+          >
+            {isLoading ? '불러오는 중...' : (
+              <>더보기 <ChevronDown className="w-4 h-4" /></>
+            )}
+          </button>
+        )}
       </main>
     </div>
   );

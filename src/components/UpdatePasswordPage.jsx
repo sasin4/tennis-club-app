@@ -7,21 +7,29 @@ import { Lock, Mail, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 export default function UpdatePasswordPage() {
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
   const [mode, setMode] = useState('request'); // 'request' (이메일 입력) | 'update' (새 비번 입력)
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 사용자가 비밀번호 재설정 메일의 링크를 타고 들어왔는지 확인
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      // 세션이 있다면(링크를 클릭해서 들어왔다면) 바로 비밀번호 변경 모드로 전환
-      if (session) {
+    // 1. Supabase 인증 상태 변경 감지 (이메일 링크 클릭 시 PASSWORD_RECOVERY 이벤트 발생)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
         setMode('update');
       }
+    });
+
+    // 2. URL 해시나 쿼리 파라미터에 recovery 정보가 있는지 직접 확인 (보조 수단)
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery') && hash.includes('access_token=')) {
+      setMode('update');
+    }
+
+    return () => {
+      if (subscription) subscription.unsubscribe();
     };
-    checkSession();
   }, []);
 
   // 1단계: 비밀번호 재설정 이메일 요청
@@ -41,12 +49,18 @@ export default function UpdatePasswordPage() {
   // 2단계: 새 비밀번호로 업데이트
   const handleUpdate = async (e) => {
     e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      alert('비밀번호가 서로 일치하지 않습니다.');
+      return;
+    }
+
     setIsLoading(true);
     const result = await updatePassword(newPassword);
     setIsLoading(false);
     
     if (result.success) {
       alert('비밀번호가 성공적으로 변경되었습니다. 다시 로그인해주세요.');
+      await supabase.auth.signOut(); // 변경 후 기존 세션 정리
       navigate('/');
     } else {
       alert(`변경 실패: ${result.error}`);
@@ -93,6 +107,11 @@ export default function UpdatePasswordPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-300" />
                 <input type="password" placeholder="새 비밀번호 (6자리 이상)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                       className="w-full pl-10 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-[#002B5C]" required minLength={6} />
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-300" />
+                <input type="password" placeholder="비밀번호 확인" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
                        className="w-full pl-10 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-[#002B5C]" required minLength={6} />
               </div>
               <button type="submit" disabled={isLoading} className="w-full bg-[#FFC510] text-[#002B5C] py-3 rounded-xl font-black hover:bg-yellow-400 transition flex items-center justify-center gap-2">

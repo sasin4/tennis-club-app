@@ -15,30 +15,32 @@ export const insertMatchResult = async (matchPayload) => {
       .from('games')
       .insert([
         {
-          match_date: matchPayload.game_date,
+          game_date: matchPayload.game_date,
+          game_number: 1, // DB에서 NOT NULL인 game_number 필드에 기본값 1을 추가합니다.
           match_type: matchPayload.match_type,
-          team1_p1_id: currentUserId, // 현재 로그인한 내 유저 ID
-          team1_p2_id: matchPayload.partner_id || null,
-          team2_p1_id: matchPayload.opponent1_id,
-          team2_p2_id: matchPayload.opponent2_id || null,
+          team1_player1_id: currentUserId, // 현재 로그인한 내 유저 ID
+          team1_player2_id: matchPayload.partner_id || null,
+          team2_player1_id: matchPayload.opponent1_id,
+          team2_player2_id: matchPayload.opponent2_id || null,
           winner_team: matchPayload.winner_team, // 폼에서 계산해서 넘겨준 승리팀 번호 (1 또는 2)
         }
       ])
       .select()
       .single(); // 생성된 단일 로우 데이터 가져오기
 
-    if (matchError) throw matchError;
+    if (matchError) throw new Error(`경기 정보 저장 실패: ${matchError.message}`);
+    if (!matchData) throw new Error('경기 정보를 저장했으나 데이터를 반환받지 못했습니다. RLS 정책(SELECT)을 확인하세요.');
 
-    const generatedMatchId = matchData.id;
+    const generatedMatchId = matchData.game_id;
 
     // [Step B] 세트 스코어 배열 조립 후 일괄(Bulk) 인서트
     const setsPayload = matchPayload.sets.map((set) => ({
-      match_id: generatedMatchId,
+      game_id: generatedMatchId,
       set_number: set.set_number,
       team1_score: set.team1_score,
       team2_score: set.team2_score,
-      team1_tiebreak: set.team1_tiebreak,
-      team2_tiebreak: set.team2_tiebreak,
+      team1_tiebreak_score: set.team1_tiebreak,
+      team2_tiebreak_score: set.team2_tiebreak,
     }));
 
     const { error: setsError } = await supabase
@@ -58,41 +60,54 @@ export const insertMatchResult = async (matchPayload) => {
  * 2. 전체 경기 기록 가져오기 (관계형 조인)
  * 한 테이블을 가져오면서 연관된 세트 스코어와 상대방 이름까지 한 번에 긁어옵니다.
  */
-export const fetchMatchHistory = async (page = 1, pageSize = 5) => {
+export const fetchMatchHistory = async (page = 1, pageSize = 5, filters = {}) => {
   try {
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
     // Supabase(PostgREST)의 강력한 장점: 쿼리 한 줄로 하위 테이블 및 외래키 참조 테이블 조인이 가능합니다.
-    const { data, error } = await supabase
+    let query = supabase
       .from('games')
       .select(`
-        id,
-        match_date,
+        game_id,
+        game_date,
+        game_number,
         match_type,
         winner_team,
         game_sets (
           set_number,
           team1_score,
           team2_score,
-          team1_tiebreak,
-          team2_tiebreak
+          team1_tiebreak_score,
+          team2_tiebreak_score
         ),
-        partner:profiles!team1_p2_id_fkey(name),
-        opponent1:profiles!team2_p1_id_fkey(name),
-        opponent2:profiles!team2_p2_id_fkey(name)
-      `)
-      .order('match_date', { ascending: false }) // 최신순 정렬
-      .range(from, to); // 오프셋 페이징 처리
+        partner:profiles!team1_player2_id(name),
+        opponent1:profiles!team2_player1_id(name),
+        opponent2:profiles!team2_player2_id(name)
+      `);
 
+    // 필터 조건 적용
+    if (filters.startDate) query = query.gte('game_date', filters.startDate);
+    if (filters.endDate) query = query.lte('game_date', filters.endDate);
+    if (filters.result === 'win') query = query.eq('winner_team', 1);
+    if (filters.result === 'lose') query = query.eq('winner_team', 2);
+    
+    // 추가 제안 필터: 경기 방식 (단식/복식)
+    if (filters.matchType && filters.matchType !== 'all') {
+      query = query.eq('match_type', filters.matchType);
+    }
+
+    const { data, error } = await query
+      .order('game_date', { ascending: false }) // 최신순 정렬
+      .range(from, to); // 오프셋 페이징 처리
     if (error) throw error;
 
     // 프론트엔드 UI 컴포넌트 형태에 맞게 데이터 가공(매핑)
     return data.map((match) => {
       const isMyTeamWin = match.winner_team === 1;
       return {
-        id: match.id,
-        date: match.match_date.replace(/-/g, '.'),
+        id: match.game_id,
+        date: match.game_date.replace(/-/g, '.'),
         type: match.match_type === 'Doubles' ? '복식' : '단식',
         partner: match.partner?.name || null,
         opponents: [match.opponent1?.name, match.opponent2?.name].filter(Boolean),
@@ -101,8 +116,8 @@ export const fetchMatchHistory = async (page = 1, pageSize = 5) => {
           .map((s) => ({
             team1: s.team1_score,
             team2: s.team2_score,
-            t1Tie: s.team1_tiebreak,
-            t2Tie: s.team2_tiebreak,
+            t1Tie: s.team1_tiebreak_score,
+            t2Tie: s.team2_tiebreak_score,
           })),
         isWinner: isMyTeamWin,
       };
@@ -118,29 +133,30 @@ export const fetchMatchDetail = async (matchId) => {
     const { data, error } = await supabase
       .from('games')
       .select(`
-        id,
-        match_date,
+        game_id,
+        game_date,
+        game_number,
         match_type,
         winner_team,
         game_sets (
           set_number,
           team1_score,
           team2_score,
-          team1_tiebreak,
-          team2_tiebreak    ),
-        partner:profiles!team1_p2_id_fkey(name),  
-        opponent1:profiles!team2_p1_id_fkey(name),
-        opponent2:profiles!team2_p2_id_fkey(name)
+          team1_tiebreak_score,
+          team2_tiebreak_score    ),
+        partner:profiles!team1_player2_id(name),  
+        opponent1:profiles!team2_player1_id(name),
+        opponent2:profiles!team2_player2_id(name)
       `)
-      .eq('id', matchId)
+      .eq('game_id', matchId)
       .single();
 
     if (error) throw error;
 
     const isMyTeamWin = data.winner_team === 1;
     return {
-      id: data.id,
-      date: data.match_date.replace(/-/g, '.'),
+      id: data.game_id,
+      date: data.game_date.replace(/-/g, '.'),
       type: data.match_type === 'Doubles' ? '복식' : '단식',
       partner: data.partner?.name || null,
       opponents: [data.opponent1?.name, data.opponent2?.name].filter(Boolean),    
@@ -149,8 +165,8 @@ export const fetchMatchDetail = async (matchId) => {
         .map((s) => ({  
           team1: s.team1_score,
           team2: s.team2_score,
-          t1Tie: s.team1_tiebreak,
-          t2Tie: s.team2_tiebreak,
+          t1Tie: s.team1_tiebreak_score,
+          t2Tie: s.team2_tiebreak_score,
         })),
       isWinner: isMyTeamWin,
     };
@@ -175,14 +191,22 @@ export const signUpUser = async (email, password, name, phone, avatarFile = null
     });
 
     if (error) throw error;
-    // If an avatar file was provided, upload it and upsert the profile
-    if (avatarFile && data?.user) {
-      const uploadResult = await uploadProfileImage(data.user.id, avatarFile, name, phone, email);
-      if (!uploadResult.success) {
-        // Signup succeeded but avatar upload failed - return info so caller can notify user
-        return { success: true, data, upload: { success: false, error: uploadResult.error } };
+
+    if (data?.user) {
+      // 사진이 있든 없든 프로필 테이블에 기본 정보 저장
+      if (avatarFile) {
+        const uploadResult = await uploadProfileImage(data.user.id, avatarFile, name, phone, email);
+        if (!uploadResult.success) {
+          return { success: true, data, upload: { success: false, error: uploadResult.error } };
+        }
+        return { success: true, data, upload: { success: true, url: uploadResult.url } };
+      } else {
+        // 사진이 없는 경우 텍스트 정보만 바로 저장
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({ id: data.user.id, name, phone, email });
+        if (profileError) throw profileError;
       }
-      return { success: true, data, upload: { success: true, url: uploadResult.url } };
     }
 
     return { success: true, data };
@@ -356,5 +380,262 @@ export const updateUserProfile = async (userId, newEmail, name, phone, avatarUrl
   } catch (error) {
     console.error('프로필 업데이트 실패:', error.message);
     return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 이름으로 프로필 검색
+ */
+export const searchProfilesByName = async (nameQuery) => {
+  if (!nameQuery || nameQuery.trim().length < 1) return [];
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .ilike('name', `%${nameQuery}%`)
+      .limit(5);
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('프로필 검색 중 오류 발생:', error.message);
+    return [];
+  }
+};
+
+/**
+ * 4. 대시보드용 통계 데이터 계산
+ * RPC 함수 없이 클라이언트 사이드에서 직접 집계합니다.
+ */
+export const fetchDashboardStats = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    // [A] 내 통계용: 내가 참여한 모든 경기
+    const { data: games, error } = await supabase
+      .from('games')
+      .select('game_date, winner_team')
+      .or(`team1_player1_id.eq.${user.id},team1_player2_id.eq.${user.id},team2_player1_id.eq.${user.id},team2_player2_id.eq.${user.id}`)
+      .order('game_date', { ascending: false });
+
+    if (error) throw error;
+
+    const recentGames = games.slice(0, 10);
+    const recentWins = recentGames.filter(g => g.winner_team === 1).length;
+    const recentTotal = recentGames.length;
+    const winRate = recentTotal > 0 ? Math.round((recentWins / recentTotal) * 100) : 0;
+
+    const statsMap = {};
+    games.forEach(g => {
+      const month = g.game_date.slice(0, 7); // "2024-05"
+      statsMap[month] = (statsMap[month] || 0) + 1;
+    });
+
+    const monthlyTrends = Object.entries(statsMap)
+      .map(([month, count]) => ({
+        match_month: month.replace('-', '.'), // "2024.05"
+        match_count: count
+      }))
+      .sort((a, b) => b.match_month.localeCompare(a.match_month))
+      .slice(0, 5); // 최근 5개월만 표시
+
+    // [B] 이달의 포인트 리더 계산 (클럽 전체 대상)
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('sv-SE');
+
+    const { data: allMonthGames, error: allMonthError } = await supabase
+      .from('games')
+      .select(`
+        winner_team,
+        t1p1:profiles!team1_player1_id(id, name, avatar_url),
+        t1p2:profiles!team1_player2_id(id, name, avatar_url),
+        t2p1:profiles!team2_player1_id(id, name, avatar_url),
+        t2p2:profiles!team2_player2_id(id, name, avatar_url)
+      `)
+      .gte('game_date', firstDay);
+
+    if (allMonthError) throw allMonthError;
+
+    const winCounts = {};
+    allMonthGames?.forEach(game => {
+      const winners = game.winner_team === 1
+        ? [game.t1p1, game.t1p2]
+        : [game.t2p1, game.t2p2];
+      
+      winners.filter(Boolean).forEach(p => {
+        if (!winCounts[p.id]) {
+          winCounts[p.id] = { name: p.name, avatar_url: p.avatar_url, wins: 0 };
+        }
+        winCounts[p.id].wins += 1;
+      });
+    });
+
+    const pointLeaders = Object.entries(winCounts)
+      .map(([id, data]) => ({ 
+        name: data.name, 
+        wins: data.wins, 
+        avatar_url: data.avatar_url 
+      }))
+      .sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name))
+      .slice(0, 3);
+
+    // [C] 영혼의 단짝 계산 (나와 함께한 복식 파트너)
+    const { data: myDoubles, error: doublesError } = await supabase
+      .from('games')
+      .select(`
+        winner_team,
+        team1_player1_id, team1_player2_id, team2_player1_id, team2_player2_id,
+        t1p1:profiles!team1_player1_id(id, name, avatar_url),
+        t1p2:profiles!team1_player2_id(id, name, avatar_url),
+        t2p1:profiles!team2_player1_id(id, name, avatar_url),
+        t2p2:profiles!team2_player2_id(id, name, avatar_url)
+      `)
+      .eq('match_type', 'Doubles')
+      .or(`team1_player1_id.eq.${user.id},team1_player2_id.eq.${user.id},team2_player1_id.eq.${user.id},team2_player2_id.eq.${user.id}`);
+
+    if (doublesError) throw doublesError;
+
+    const partnerMap = {};
+    myDoubles?.forEach(game => {
+      let partnerData = null;
+      let isWin = false;
+
+      if (game.team1_player1_id === user.id) { partnerData = game.t1p2; isWin = game.winner_team === 1; }
+      else if (game.team1_player2_id === user.id) { partnerData = game.t1p1; isWin = game.winner_team === 1; }
+      else if (game.team2_player1_id === user.id) { partnerData = game.t2p2; isWin = game.winner_team === 2; }
+      else if (game.team2_player2_id === user.id) { partnerData = game.t2p1; isWin = game.winner_team === 2; }
+
+      if (partnerData) {
+        if (!partnerMap[partnerData.id]) {
+          partnerMap[partnerData.id] = { name: partnerData.name, avatar_url: partnerData.avatar_url, wins: 0, losses: 0, total: 0 };
+        }
+        partnerMap[partnerData.id].total += 1;
+        if (isWin) partnerMap[partnerData.id].wins += 1;
+        else partnerMap[partnerData.id].losses += 1;
+      }
+    });
+
+    const soulmates = Object.values(partnerMap)
+      .sort((a, b) => b.total - a.total || b.wins - a.wins)
+      .slice(0, 3);
+
+    return {
+      recent_win_rate: winRate,
+      recent_wins: recentWins,
+      recent_total: recentTotal,
+      monthly_trends: monthlyTrends.reverse(), // 연대순 표시를 위해 반전
+      point_leaders: pointLeaders,
+      soulmates: soulmates,
+      avg_points_per_set: 0 // 필요 시 추가 구현 가능
+    };
+  } catch (error) {
+    console.error('대시보드 통계 계산 실패:', error.message);
+    return null;
+  }
+};
+
+/**
+ * 5. 월별 전체 순위 데이터 가져오기
+ */
+export const fetchMonthlyRankings = async (year, month) => {
+  try {
+    // 해당 월의 시작일과 종료일 계산
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+
+    const { data: games, error } = await supabase
+      .from('games')
+      .select(`
+        winner_team,
+        t1p1:profiles!team1_player1_id(id, name, avatar_url),
+        t1p2:profiles!team1_player2_id(id, name, avatar_url),
+        t2p1:profiles!team2_player1_id(id, name, avatar_url),
+        t2p2:profiles!team2_player2_id(id, name, avatar_url)
+      `)
+      .gte('game_date', startDate)
+      .lte('game_date', endDate);
+
+    if (error) throw error;
+
+    const playerMap = {}; // { id: { name, avatar_url, wins, losses, total } }
+
+    games?.forEach(game => {
+      const team1 = [game.t1p1, game.t1p2].filter(Boolean);
+      const team2 = [game.t2p1, game.t2p2].filter(Boolean);
+      
+      const processPlayer = (player, isWin) => {
+        if (!playerMap[player.id]) {
+          playerMap[player.id] = { name: player.name, avatar_url: player.avatar_url, wins: 0, losses: 0, total: 0 };
+        }
+        playerMap[player.id].total += 1;
+        if (isWin) playerMap[player.id].wins += 1;
+        else playerMap[player.id].losses += 1;
+      };
+
+      const winnerTeamNum = game.winner_team;
+      team1.forEach(p => processPlayer(p, winnerTeamNum === 1));
+      team2.forEach(p => processPlayer(p, winnerTeamNum === 2));
+    });
+
+    return Object.values(playerMap).sort((a, b) => {
+      // 1순위: 승수, 2순위: 적은 패수, 3순위: 이름순
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      if (a.losses !== b.losses) return a.losses - b.losses;
+      return a.name.localeCompare(b.name);
+    });
+  } catch (error) {
+    console.error('순위 데이터 로드 실패:', error.message);
+    return [];
+  }
+};
+
+/**
+ * 6. 전체 파트너 순위 데이터 가져오기
+ */
+export const fetchPartnerRankings = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: games, error } = await supabase
+      .from('games')
+      .select(`
+        winner_team,
+        team1_player1_id, team1_player2_id, team2_player1_id, team2_player2_id,
+        t1p1:profiles!team1_player1_id(id, name, avatar_url),
+        t1p2:profiles!team1_player2_id(id, name, avatar_url),
+        t2p1:profiles!team2_player1_id(id, name, avatar_url),
+        t2p2:profiles!team2_player2_id(id, name, avatar_url)
+      `)
+      .eq('match_type', 'Doubles')
+      .or(`team1_player1_id.eq.${user.id},team1_player2_id.eq.${user.id},team2_player1_id.eq.${user.id},team2_player2_id.eq.${user.id}`);
+
+    if (error) throw error;
+
+    const partnerMap = {};
+    games?.forEach(game => {
+      let p = null;
+      let isWin = false;
+
+      if (game.team1_player1_id === user.id) { p = game.t1p2; isWin = game.winner_team === 1; }
+      else if (game.team1_player2_id === user.id) { p = game.t1p1; isWin = game.winner_team === 1; }
+      else if (game.team2_player1_id === user.id) { p = game.t2p2; isWin = game.winner_team === 2; }
+      else if (game.team2_player2_id === user.id) { p = game.t2p1; isWin = game.winner_team === 2; }
+
+      if (p) {
+        if (!partnerMap[p.id]) {
+          partnerMap[p.id] = { id: p.id, name: p.name, avatar_url: p.avatar_url, wins: 0, losses: 0, total: 0 };
+        }
+        partnerMap[p.id].total += 1;
+        if (isWin) partnerMap[p.id].wins += 1;
+        else partnerMap[p.id].losses += 1;
+      }
+    });
+
+    return Object.values(partnerMap).sort((a, b) => b.total - a.total || b.wins - a.wins);
+  } catch (error) {
+    console.error('파트너 데이터 로드 실패:', error.message);
+    return [];
   }
 };

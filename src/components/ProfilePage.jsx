@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { verifyPassword, updateUserProfile, uploadProfileImage } from '../api/tennisApi';
-import { User, Mail, Phone, Calendar, Hash, Lock, Camera, Loader2, ArrowLeft } from 'lucide-react';
+import { User, Mail, Phone, Calendar, Hash, Lock, Camera, Loader2, ArrowLeft, LogOut } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
   
   // 화면 모드: 'view'(조회) | 'password'(비밀번호 확인) | 'edit'(수정)
   const [viewMode, setViewMode] = useState('view');
@@ -188,6 +190,18 @@ export default function ProfilePage() {
               className="mt-8 w-full bg-[#002B5C] text-white py-3 rounded-xl font-bold hover:bg-blue-900 transition"
             >
               수정하기
+            </button>
+
+            {/* 로그아웃 버튼 추가 */}
+            <button 
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate('/');
+              }}
+              className="mt-4 w-full flex items-center justify-center gap-2 py-3 text-red-600 font-bold hover:bg-red-50 transition border border-red-100 rounded-xl"
+            >
+              <LogOut className="w-5 h-5" />
+              로그아웃
             </button>
           </div>
         )}

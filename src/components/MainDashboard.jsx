@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Home, User, LogOut, Activity, Trophy, TrendingUp, ChevronRight, Plus } from 'lucide-react';
+import { Menu, Home, User, LogOut, Activity, Trophy, TrendingUp, ChevronRight, Plus, Award, Users } from 'lucide-react';
 import SkeletonLoader from './SkeletonLoader';
-import { fetchDashboardStats, supabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient';
+import { fetchDashboardStats } from '../api/tennisApi';
 
 
-export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigateToRegister, onNavigateToDashboard, onNavigateToProfile }) {
+export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigateToRegister, onNavigateToDashboard, onNavigateToProfile, onNavigateToRankings, onNavigateToPartnerRankings }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const safeStats = {
@@ -13,6 +14,8 @@ export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigat
     recent_wins: 0,
     recent_total: 0,
     monthly_trends: [],
+    point_leaders: [],
+    soulmates: [],
     avg_points_per_set: 0,
     ...stats,
   };
@@ -188,6 +191,133 @@ export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigat
               <div className="text-2xl font-black text-[#002B5C]">{safeStats.recent_wins}승 {safeStats.recent_total - safeStats.recent_wins}패</div>
               <div className="text-[10px] text-gray-400">최근 10경기 전적</div>
             </div>
+          </div>
+        </section>
+
+        {/* 이달의 Point Leader Top 3 섹션 */}
+        <section className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-sm font-bold text-[#002B5C] flex items-center gap-2">
+              <Award className="w-4 h-4 text-[#FFC510]" /> 이달의 Point Leader Top 3
+            </h2>
+            <button 
+              onClick={onNavigateToRankings}
+              className="text-[10px] font-bold text-blue-500 hover:underline flex items-center"
+            >
+              전체순위보기 <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+          
+          <div className="flex justify-around items-end pt-4 pb-2 h-40">
+            {/* 2위 */}
+            {safeStats.point_leaders[1] ? (
+              <div className="flex flex-col items-center flex-1">
+                <div className="text-[10px] font-bold text-gray-400 mb-1">{safeStats.point_leaders[1].wins}승</div>
+                <div className="w-12 h-12 rounded-full border-2 border-gray-100 overflow-hidden mb-2 shadow-sm bg-gray-50">
+                  {safeStats.point_leaders[1].avatar_url ? (
+                    <img src={safeStats.point_leaders[1].avatar_url} className="w-full h-full object-cover" alt="" />
+                  ) : (
+                    <User className="w-full h-full p-2 text-gray-300" />
+                  )}
+                </div>
+                <div className="w-10 bg-gray-100 rounded-t-lg flex items-end justify-center pb-1 h-12 shadow-inner">
+                  <span className="text-gray-400 font-black text-sm">2</span>
+                </div>
+                <div className="text-[10px] mt-2 font-bold text-gray-600 truncate w-full text-center px-1">
+                  {safeStats.point_leaders[1].name}
+                </div>
+              </div>
+            ) : <div className="flex-1"></div>}
+
+            {/* 1위 */}
+            {safeStats.point_leaders[0] ? (
+              <div className="flex flex-col items-center flex-1">
+                <div className="text-xs font-bold text-[#002B5C] mb-1">{safeStats.point_leaders[0].wins}승</div>
+                <div className="w-14 h-14 rounded-full border-2 border-[#FFC510] overflow-hidden mb-2 shadow-md bg-gray-50">
+                  {safeStats.point_leaders[0].avatar_url ? (
+                    <img src={safeStats.point_leaders[0].avatar_url} className="w-full h-full object-cover" alt="" />
+                  ) : (
+                    <User className="w-full h-full p-2 text-gray-300" />
+                  )}
+                </div>
+                <div className="w-12 bg-[#002B5C] rounded-t-lg flex items-end justify-center pb-2 h-16 shadow-lg">
+                  <span className="text-[#FFC510] font-black text-xl">1</span>
+                </div>
+                <div className="text-xs mt-2 font-black text-[#002B5C] truncate w-full text-center px-1">
+                  {safeStats.point_leaders[0].name}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 text-center text-xs text-gray-300 pb-4">데이터 없음</div>
+            )}
+
+            {/* 3위 */}
+            {safeStats.point_leaders[2] ? (
+              <div className="flex flex-col items-center flex-1">
+                <div className="text-[10px] font-bold text-gray-400 mb-1">{safeStats.point_leaders[2].wins}승</div>
+                <div className="w-10 h-10 rounded-full border border-gray-100 overflow-hidden mb-2 shadow-sm bg-gray-50">
+                  {safeStats.point_leaders[2].avatar_url ? (
+                    <img src={safeStats.point_leaders[2].avatar_url} className="w-full h-full object-cover" alt="" />
+                  ) : (
+                    <User className="w-full h-full p-2 text-gray-300" />
+                  )}
+                </div>
+                <div className="w-10 bg-gray-50 rounded-t-lg flex items-end justify-center pb-1 h-8 border-x border-t border-gray-100">
+                  <span className="text-gray-300 font-black text-xs">3</span>
+                </div>
+                <div className="text-[10px] mt-2 font-bold text-gray-500 truncate w-full text-center px-1">
+                  {safeStats.point_leaders[2].name}
+                </div>
+              </div>
+            ) : <div className="flex-1"></div>}
+          </div>
+        </section>
+
+        {/* 영혼의 단짝 섹션 추가 */}
+        <section className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-sm font-bold text-[#002B5C] flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-500" /> 영혼의 단짝 (Soulmates)
+            </h2>
+            <button 
+              onClick={onNavigateToPartnerRankings}
+              className="text-[10px] font-bold text-blue-500 hover:underline flex items-center"
+            >
+              전체파트너보기 <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            {safeStats.soulmates.length > 0 ? (
+              safeStats.soulmates.map((p, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl border border-gray-100">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-white border border-gray-200">
+                    {p.avatar_url ? (
+                      <img src={p.avatar_url} className="w-full h-full object-cover" alt="" />
+                    ) : (
+                      <User className="w-full h-full p-2 text-gray-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-[#002B5C] truncate">{p.name}</div>
+                    <div className="text-[10px] text-gray-400">총 {p.total}회 페어</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="text-center">
+                      <div className="text-[10px] font-black text-blue-600">{p.wins}</div>
+                      <div className="text-[8px] text-gray-400 uppercase">Win</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[10px] font-black text-red-400">{p.losses}</div>
+                      <div className="text-[8px] text-gray-400 uppercase">Lose</div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-xs text-gray-300">
+                아직 복식 경기 기록이 없습니다.
+              </div>
+            )}
           </div>
         </section>
 
