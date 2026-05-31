@@ -178,6 +178,20 @@ export const fetchMatchDetail = async (matchId) => {
 
 export const signUpUser = async (email, password, name, phone, avatarFile = null) => {
   try {
+    // 0. 중복 계정 확인 (이메일 또는 휴대폰 번호)
+    const { data: existingUser, error: checkError } = await supabase
+      .from('profiles')
+      .select('email, phone')
+      .or(`email.eq.${email},phone.eq.${phone}`)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
+
+    if (existingUser) {
+      const isEmailDup = existingUser.email === email;
+      return { success: false, error: 'ALREADY_EXISTS', message: `이미 등록된 ${isEmailDup ? '이메일' : '휴대폰 번호'}입니다.` };
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password, // 인증용 비밀번호 (Supabase가 알아서 안전하게 해싱하여 auth.users에 저장)
