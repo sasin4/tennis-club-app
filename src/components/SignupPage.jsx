@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Loader2, ArrowLeft, Camera } from 'lucide-react';
 import { signUpUser, uploadProfileImage } from '../api/tennisApi';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
 export default function SignupPage({ onBack }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -42,6 +44,10 @@ export default function SignupPage({ onBack }) {
       }
       alert('회원가입 성공! 이메일을 확인하여 인증을 완료해주세요.');
       onBack();
+    } else if (result.error === 'ALREADY_EXISTS') {
+      if (window.confirm(`${result.message}\n이미 가입된 계정이 있습니다. 비밀번호 찾기 페이지로 이동하시겠습니까?`)) {
+        navigate('/update-password');
+      }
     } else {
       alert(`가입 실패: ${result.error}`);
     }
