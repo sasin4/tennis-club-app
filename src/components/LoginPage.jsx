@@ -56,8 +56,8 @@ export default function LoginPage() {
         <div className="w-20 h-20 bg-[#FFC510] rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
           <Trophy className="w-10 h-10 text-[#002B5C]" />
         </div>
-        <h1 className="text-3xl font-black text-white tracking-tight">TENNIS CLUB</h1>
-        <p className="text-blue-200 text-sm mt-1">로그인하여 경기 기록을 관리하세요</p>
+        <h1 className="text-3xl font-black text-white tracking-tight">Ensol Parc1. Tennis Club</h1>
+        <p className="text-blue-200 text-sm mt-1">True victory lies in enjoying the moments shared.</p>
       </div>
 
       {/* 로그인 폼 */}
