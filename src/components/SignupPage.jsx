@@ -48,7 +48,7 @@ export default function SignupPage({ onBack }) {
       if (result.upload && result.upload.success === false) {
         alert('회원가입은 완료되었으나, 사진 업로드에 실패했습니다. (마이페이지에서 다시 시도해주세요)');
       }
-      alert('회원가입 성공! 이메일을 확인하여 인증을 완료해주세요.');
+      //alert('회원가입 성공! 이메일을 확인하여 인증을 완료해주세요.');
       onBack();
     } else if (result.error === 'ALREADY_EXISTS') {
       if (window.confirm(`${result.message}\n이미 가입된 계정이 있습니다. 비밀번호 찾기 페이지로 이동하시겠습니까?`)) {
