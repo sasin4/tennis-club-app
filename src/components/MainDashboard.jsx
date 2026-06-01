@@ -4,6 +4,7 @@ import { Menu, Home, User, LogOut, Activity, Trophy, TrendingUp, ChevronRight, P
 import SkeletonLoader from './SkeletonLoader';
 import { supabase } from '../supabaseClient';
 import { fetchDashboardStats } from '../api/tennisApi';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 
 export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigateToRegister, onNavigateToDashboard, onNavigateToProfile, onNavigateToRankings, onNavigateToPartnerRankings }) {

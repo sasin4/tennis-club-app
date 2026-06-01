@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { signInUser } from '../api/tennisApi';
+import { validateEmail } from '../utils/validation';
 import SignupPage from './SignupPage';
 import logo from '../assets/logo.jpg';
 
@@ -16,6 +17,12 @@ export default function LoginPage({ onLogin }) {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+
+    if (!validateEmail(email)) {
+      alert('올바른 이메일 주소 형식이 아닙니다.');
+      return;
+    }
+
     setIsLoading(true);
 
     // 보완된 로그인 API 호출

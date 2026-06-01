@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Loader2, ArrowLeft, Camera } from 'lucide-react';
 import { signUpUser, uploadProfileImage } from '../api/tennisApi';
+import { validateEmail } from '../utils/validation';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
@@ -30,6 +31,11 @@ export default function SignupPage({ onBack }) {
     e.preventDefault();
     if (!phone || phone.length < 10) {
       alert('유효한 휴대폰 번호를 입력해주세요.'); return;
+    }
+
+    if (!validateEmail(email)) {
+      alert('올바른 이메일 주소 형식이 아닙니다.');
+      return;
     }
     
     setIsLoading(true);
