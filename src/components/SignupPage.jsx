@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Loader2, ArrowLeft, Camera } from 'lucide-react';
 import { signUpUser, uploadProfileImage } from '../api/tennisApi';
-import { validateEmail } from '../utils/validation';
+import { validateEmail } from './validation';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
