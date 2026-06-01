@@ -4,7 +4,7 @@ import { Menu, Home, User, LogOut, Activity, Trophy, TrendingUp, ChevronRight, P
 import SkeletonLoader from './SkeletonLoader';
 import { supabase } from '../supabaseClient';
 import { fetchDashboardStats } from '../api/tennisApi';
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 
 export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigateToRegister, onNavigateToDashboard, onNavigateToProfile, onNavigateToRankings, onNavigateToPartnerRankings }) {
@@ -105,6 +105,8 @@ export default function MainDashboard({ onLogout, onNavigateToHistory, onNavigat
   // [데이터 로딩 완료 후]
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Vercel 성능 분석 활성화 */}
+      <SpeedInsights />
       {/* 대시보드 상단 헤더 영역 */}
       <header className="flex justify-between items-center mb-8 relative">
         {/* 🚨 교체된 타이틀 영역: 사진 + 텍스트 */}
