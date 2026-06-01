@@ -288,42 +288,38 @@ export const updatePassword = async (newPassword) => {
 // 프로필 사진 업로드 및 DB 업데이트 함수 추가
 export const uploadProfileImage = async (userId, file, name = null, phone = null, email = null) => {
   try {
-    console.log('📸 [Step 1] 파일 업로드 시작', { userId, fileName: file.name, fileSize: file.size });
+    console.log('📸 [Upload] 시작 - 파라미터 확인:', { userId, fileName: file?.name, fileSize: file?.size, name, phone, email });
     
+    if (!file) throw new Error('업로드할 파일이 없습니다.');
+
     // 1. 파일 이름 난수화 (중복 방지)
     const fileExt = file.name.split('.').pop();
     const fileName = `${userId}_${Math.random()}.${fileExt}`;
     const filePath = `${fileName}`;
-    console.log('📝 [Step 1] 생성된 파일 경로:', filePath);
 
     // 2. Storage 'avatars' 버킷에 파일 업로드
-    console.log('⬆️ [Step 2] Supabase Storage에 업로드 중...');
+    console.log('⬆️ [Step 1] Storage 업로드 시도 경로:', filePath);
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(filePath, file);
 
     if (uploadError) {
-      console.error('❌ [Step 2] 업로드 실패:', uploadError);
+      console.error('❌ [Step 1] Storage 업로드 실패. 버킷 이름 "avatars" 존재 여부와 RLS 정책을 확인하세요:', uploadError);
       throw uploadError;
     }
-    console.log('✅ [Step 2] 업로드 성공:', uploadData);
 
     // 3. 업로드된 파일의 공개 URL 가져오기
-    console.log('🔗 [Step 3] 공개 URL 생성 중...');
     const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
     const publicUrl = data.publicUrl;
-    console.log('✅ [Step 3] 공개 URL:', publicUrl);
+    console.log('🔗 [Step 2] 공개 URL 생성 완료:', publicUrl);
 
     // 4. profiles 테이블에 avatar_url을 삽입 또는 업데이트 (프로필이 없으면 생성)
-    console.log('💾 [Step 4] DB에 저장 중...', { id: userId, avatar_url: publicUrl });
-    
     // email이 전달되지 않으면 현재 인증된 사용자의 이메일 가져오기
     let userEmail = email;
     if (!userEmail) {
       const { data: currentUserData } = await supabase.auth.getUser();
       userEmail = currentUserData?.user?.email;
     }
-    console.log('📧 현재 사용자 이메일:', userEmail);
     
     const profileData = { 
       id: userId, 
@@ -335,27 +331,21 @@ export const uploadProfileImage = async (userId, file, name = null, phone = null
     if (name) profileData.name = name;
     if (phone) profileData.phone = phone;
     
+    console.log('💾 [Step 3] Profiles 테이블 Upsert 시도:', profileData);
     const { data: upsertData, error: updateError } = await supabase
       .from('profiles')
       .upsert(profileData);
     
 
     if (updateError) {
-      console.error('❌ [Step 4] DB 저장 실패:', updateError);
+      console.error('❌ [Step 3] Profiles DB 저장 실패. RLS 정책을 확인하세요:', updateError);
       throw updateError;
     }
-    console.log('✅ [Step 4] DB 저장 성공:', upsertData);
 
-    console.log('🎉 [완료] 프로필 사진 업로드 완료!');
+    console.log('🎉 [Success] 프로필 사진 업로드 및 DB 갱신 완료');
     return { success: true, url: publicUrl };
   } catch (error) {
-    console.error('❌ [전체] 사진 업로드 에러:', error);
-    console.error('📋 에러 상세:', {
-      message: error.message,
-      code: error.code,
-      status: error.status,
-      stack: error.stack
-    });
+    console.error('🚨 [Critical Error] 사진 업로드 프로세스 중단:', error);
     return { success: false, error: error.message };
   }
 };
